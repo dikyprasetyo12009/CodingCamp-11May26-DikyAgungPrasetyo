@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Expenses &amp; Budget Visualizer</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <!-- ── Header ──────────────────────────────────────────────────────────── -->
+    <header class="app-header">
+      <h1 class="app-title">Expenses &amp; Budget Visualizer</h1>
+      <button id="btn-export-csv" class="btn btn-secondary" type="button">
+        Export CSV
+      </button>
+    </header>
+
+    <!-- ── Main Layout ─────────────────────────────────────────────────────── -->
+    <main class="app-main">
+
+      <!-- ── Dashboard ───────────────────────────────────────────────────── -->
+      <section class="dashboard" aria-label="Dashboard">
+
+        <!-- Month Navigation -->
+        <div class="month-nav" id="month-nav" role="navigation" aria-label="Month navigation">
+          <button id="btn-prev-month" class="btn btn-icon" type="button" aria-label="Previous month">
+            &#8249;
+          </button>
+          <span id="selected-month-label" class="month-label" aria-live="polite"></span>
+          <button id="btn-next-month" class="btn btn-icon" type="button" aria-label="Next month">
+            &#8250;
+          </button>
+        </div>
+
+        <!-- Summary Panel -->
+        <div class="summary-panel" id="summary-panel" aria-label="Spending summary">
+          <div class="summary-total">
+            <span class="summary-total-label">Total Spent</span>
+            <span id="summary-total-amount" class="summary-total-amount">0.00</span>
+          </div>
+          <div class="summary-categories" id="summary-categories" role="list">
+            <!-- Category rows rendered by renderSummaryPanel() -->
+          </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="charts-container" id="charts-container">
+          <!-- No-data message -->
+          <p id="charts-no-data" class="charts-no-data" hidden>
+            No expenses recorded for this month.
+          </p>
+
+          <!-- Pie Chart -->
+          <div class="chart-wrapper" id="pie-chart-wrapper">
+            <h2 class="chart-title">Spending by Category</h2>
+            <canvas
+              id="pie-chart"
+              class="chart-canvas"
+              width="300"
+              height="300"
+              aria-label="Pie chart showing proportion of total spending per category for the selected month"
+            >
+              Pie chart: spending proportion per category. Enable canvas support to view this chart.
+            </canvas>
+          </div>
+
+          <!-- Bar Chart -->
+          <div class="chart-wrapper" id="bar-chart-wrapper">
+            <h2 class="chart-title">Spending vs Budget</h2>
+            <canvas
+              id="bar-chart"
+              class="chart-canvas"
+              width="400"
+              height="300"
+              aria-label="Bar chart comparing spending amount versus budget limit per category for the selected month"
+            >
+              Bar chart: spending versus budget per category. Enable canvas support to view this chart.
+            </canvas>
+          </div>
+        </div>
+
+      </section>
+      <!-- /dashboard -->
+
+      <!-- ── Right Column ─────────────────────────────────────────────────── -->
+      <div class="right-column">
+
+        <!-- Expense Form -->
+        <section class="expense-form-section" aria-label="Add or edit expense">
+          <h2 class="section-title" id="expense-form-title">Add Expense</h2>
+          <form id="expense-form" class="form" novalidate>
+            <div class="form-group">
+              <label for="expense-amount" class="form-label">Amount <span aria-hidden="true">*</span></label>
+              <input
+                type="number"
+                id="expense-amount"
+                name="amount"
+                class="form-input"
+                placeholder="0.00"
+                min="0.01"
+                step="0.01"
+                required
+                aria-required="true"
+                aria-describedby="expense-amount-error"
+              />
+              <span id="expense-amount-error" class="form-error" role="alert" aria-live="polite"></span>
+            </div>
+
+            <div class="form-group">
+              <label for="expense-category" class="form-label">Category <span aria-hidden="true">*</span></label>
+              <select
+                id="expense-category"
+                name="category"
+                class="form-select"
+                required
+                aria-required="true"
+                aria-describedby="expense-category-error"
+              >
+                <option value="">-- Select category --</option>
+                <!-- Options populated by renderExpenseForm() -->
+              </select>
+              <span id="expense-category-error" class="form-error" role="alert" aria-live="polite"></span>
+            </div>
+
+            <div class="form-group">
+              <label for="expense-date" class="form-label">Date <span aria-hidden="true">*</span></label>
+              <input
+                type="date"
+                id="expense-date"
+                name="date"
+                class="form-input"
+                required
+                aria-required="true"
+                aria-describedby="expense-date-error"
+              />
+              <span id="expense-date-error" class="form-error" role="alert" aria-live="polite"></span>
+            </div>
+
+            <div class="form-group">
+              <label for="expense-description" class="form-label">Description <span class="form-label-optional">(optional)</span></label>
+              <input
+                type="text"
+                id="expense-description"
+                name="description"
+                class="form-input"
+                placeholder="Up to 200 characters"
+                maxlength="200"
+                aria-describedby="expense-description-error"
+              />
+              <span id="expense-description-error" class="form-error" role="alert" aria-live="polite"></span>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" id="btn-save-expense" class="btn btn-primary">Add Expense</button>
+              <button type="button" id="btn-cancel-edit" class="btn btn-ghost" hidden>Cancel</button>
+            </div>
+          </form>
+        </section>
+
+        <!-- Budget Form -->
+        <section class="budget-form-section" aria-label="Set budget">
+          <h2 class="section-title">Set Budget</h2>
+          <form id="budget-form" class="form" novalidate>
+            <div class="form-group">
+              <label for="budget-category" class="form-label">Category <span aria-hidden="true">*</span></label>
+              <select
+                id="budget-category"
+                name="category"
+                class="form-select"
+                required
+                aria-required="true"
+                aria-describedby="budget-category-error"
+              >
+                <option value="">-- Select category --</option>
+                <!-- Options populated by renderBudgetForm() -->
+              </select>
+              <span id="budget-category-error" class="form-error" role="alert" aria-live="polite"></span>
+            </div>
+
+            <div class="form-group">
+              <label for="budget-amount" class="form-label">Monthly Limit <span aria-hidden="true">*</span></label>
+              <input
+                type="number"
+                id="budget-amount"
+                name="amount"
+                class="form-input"
+                placeholder="0.00"
+                min="0.01"
+                step="0.01"
+                required
+                aria-required="true"
+                aria-describedby="budget-amount-error"
+              />
+              <span id="budget-amount-error" class="form-error" role="alert" aria-live="polite"></span>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" id="btn-save-budget" class="btn btn-primary">Set Budget</button>
+            </div>
+          </form>
+        </section>
+
+      </div>
+      <!-- /right-column -->
+
+      <!-- ── Expense List ─────────────────────────────────────────────────── -->
+      <section class="expense-list-section" aria-label="Expense list">
+        <div class="expense-list-header">
+          <h2 class="section-title">Expenses</h2>
+
+          <!-- Filter Controls -->
+          <div class="filter-controls" id="filter-controls" role="search" aria-label="Filter expenses">
+            <div class="filter-group">
+              <label for="filter-category" class="filter-label">Category</label>
+              <select id="filter-category" name="filter-category" class="form-select filter-select" aria-label="Filter by category">
+                <option value="">All categories</option>
+                <!-- Options populated by renderFilters() -->
+              </select>
+            </div>
+
+            <div class="filter-group">
+              <label for="filter-month" class="filter-label">Month</label>
+              <input
+                type="month"
+                id="filter-month"
+                name="filter-month"
+                class="form-input filter-input"
+                aria-label="Filter by month"
+              />
+            </div>
+
+            <button type="button" id="btn-clear-filters" class="btn btn-ghost btn-sm">
+              Clear Filters
+            </button>
+          </div>
+        </div>
+
+        <!-- Expense Table -->
+        <div class="expense-list-wrapper" role="region" aria-label="Expense records">
+          <p id="expense-list-empty" class="expense-list-empty" hidden>
+            No expenses found.
+          </p>
+          <table id="expense-table" class="expense-table" aria-label="Expense records table">
+            <thead>
+              <tr>
+                <th scope="col">Date</th>
+                <th scope="col">Category</th>
+                <th scope="col">Amount</th>
+                <th scope="col">Description</th>
+                <th scope="col"><span class="sr-only">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody id="expense-table-body">
+              <!-- Rows rendered by renderExpenseList() -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ── Category Manager ─────────────────────────────────────────────── -->
+      <section class="category-manager-section" aria-label="Category manager">
+        <h2 class="section-title">Categories</h2>
+
+        <form id="category-form" class="form form-inline" novalidate>
+          <div class="form-group form-group-inline">
+            <label for="new-category-name" class="form-label">New Category</label>
+            <input
+              type="text"
+              id="new-category-name"
+              name="name"
+              class="form-input"
+              placeholder="Category name (1–50 chars)"
+              maxlength="50"
+              aria-describedby="new-category-error"
+            />
+            <span id="new-category-error" class="form-error" role="alert" aria-live="polite"></span>
+          </div>
+          <button type="submit" id="btn-add-category" class="btn btn-primary">Add</button>
+        </form>
+
+        <ul id="category-list" class="category-list" role="list" aria-label="Category list">
+          <!-- Items rendered by renderCategoryManager() -->
+        </ul>
+      </section>
+
+    </main>
+    <!-- /app-main -->
+
+    <!-- ── Toast Notification ───────────────────────────────────────────── -->
+    <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true">
+      <!-- Toast banners rendered by renderToast() -->
+    </div>
+
+    <script src="js/app.js" defer></script>
+  </body>
+</html>
