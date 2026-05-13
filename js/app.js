@@ -1073,31 +1073,38 @@ function renderExpenseList() {
 
     // Date cell
     var tdDate = document.createElement('td');
+    tdDate.className = 'expense-date';
     tdDate.textContent = formatDate(expense.date);
     tr.appendChild(tdDate);
 
-    // Category cell
+    // Category cell — wrapped in badge
     var tdCat = document.createElement('td');
-    tdCat.textContent = expense.category;
+    var badge = document.createElement('span');
+    badge.className = 'expense-category-badge';
+    badge.textContent = expense.category;
+    tdCat.appendChild(badge);
     tr.appendChild(tdCat);
 
     // Amount cell
     var tdAmt = document.createElement('td');
+    tdAmt.className = 'expense-amount';
     tdAmt.textContent = formatCurrency(expense.amount);
     tr.appendChild(tdAmt);
 
     // Description cell
     var tdDesc = document.createElement('td');
+    tdDesc.className = 'expense-description';
     tdDesc.textContent = expense.description || '';
     tr.appendChild(tdDesc);
 
     // Actions cell
     var tdActions = document.createElement('td');
+    tdActions.className = 'expense-actions';
 
     var editBtn = document.createElement('button');
     editBtn.type = 'button';
-    editBtn.className = 'btn btn-ghost btn-sm';
-    editBtn.textContent = 'Edit';
+    editBtn.className = 'btn btn-ghost-edit btn-sm';
+    editBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Edit';
     editBtn.setAttribute('aria-label', 'Edit expense from ' + expense.date);
     editBtn.addEventListener('click', (function (id) {
       return function () {
@@ -1105,16 +1112,15 @@ function renderExpenseList() {
           ui: Object.assign({}, state.ui, { editingExpenseId: id }),
         });
         render();
-        // Scroll to form
-        var formSection = document.querySelector('.expense-form-section');
+        var formSection = document.getElementById('section-expenses');
         if (formSection) formSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
       };
     })(expense.id));
 
     var deleteBtn = document.createElement('button');
     deleteBtn.type = 'button';
-    deleteBtn.className = 'btn btn-danger btn-sm';
-    deleteBtn.textContent = 'Delete';
+    deleteBtn.className = 'btn btn-ghost-danger btn-sm';
+    deleteBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>';
     deleteBtn.setAttribute('aria-label', 'Delete expense from ' + expense.date);
     deleteBtn.addEventListener('click', (function (id) {
       return function () { deleteExpense(id); };
@@ -1189,57 +1195,73 @@ function renderSummaryPanel() {
   categoriesEl.innerHTML = '';
 
   // Collect all categories that have a budget OR have expenses for this month
-  var relevantCategories = new Set();
+  var relevantCategories = [];
+  var seen = {};
 
-  // Categories with a budget for this month
   Object.keys(state.budgets).forEach(function (key) {
     var parts = key.split('::');
-    if (parts[1] === selectedMonth && state.budgets[key] > 0) {
-      relevantCategories.add(parts[0]);
+    if (parts[1] === selectedMonth && state.budgets[key] > 0 && !seen[parts[0]]) {
+      seen[parts[0]] = true;
+      relevantCategories.push(parts[0]);
     }
   });
 
-  // Categories with expenses for this month
   Object.keys(categorySpending).forEach(function (cat) {
-    relevantCategories.add(cat);
+    if (!seen[cat]) {
+      seen[cat] = true;
+      relevantCategories.push(cat);
+    }
   });
 
   relevantCategories.forEach(function (cat) {
-    var spent  = categorySpending[cat] || 0;
-    var budget = state.budgets[budgetKey(cat, selectedMonth)];
+    var spent     = categorySpending[cat] || 0;
+    var budget    = state.budgets[budgetKey(cat, selectedMonth)];
     var hasBudget = budget !== undefined && budget > 0;
     var exceeded  = isOverspent(spent, budget);
 
-    var row = document.createElement('div');
-    row.className = 'summary-category-row' + (exceeded ? ' summary-category-row--exceeded' : '');
-    row.setAttribute('role', 'listitem');
+    var card = document.createElement('div');
+    card.className = 'category-stat-card' + (exceeded ? ' category-stat-card--over-budget' : '');
+    card.setAttribute('role', 'listitem');
 
-    var nameEl = document.createElement('span');
-    nameEl.className = 'summary-category-name';
+    // Category name
+    var nameEl = document.createElement('p');
+    nameEl.className = 'category-stat-name';
     nameEl.textContent = cat;
-    row.appendChild(nameEl);
+    card.appendChild(nameEl);
 
-    var spentEl = document.createElement('span');
-    spentEl.className = 'summary-category-spent';
-    spentEl.textContent = formatCurrency(spent);
-    row.appendChild(spentEl);
+    // Amount spent
+    var amtEl = document.createElement('p');
+    amtEl.className = 'category-stat-amount';
+    amtEl.textContent = formatCurrency(spent);
+    card.appendChild(amtEl);
 
     if (hasBudget) {
+      var pct  = Math.min((spent / budget) * 100, 100);
       var diff = budget - spent;
-      var pct  = (spent / budget) * 100;
 
-      var budgetEl = document.createElement('span');
-      budgetEl.className = 'summary-category-budget';
-      budgetEl.textContent = 'Budget: ' + formatCurrency(budget) + ' | Diff: ' + formatCurrency(diff);
-      row.appendChild(budgetEl);
+      // Meta line
+      var metaEl = document.createElement('p');
+      metaEl.className = 'category-stat-meta' + (exceeded ? ' category-stat-meta--over' : '');
+      metaEl.textContent = (exceeded ? '⚠ Over by ' : 'Left: ') + formatCurrency(Math.abs(diff)) +
+        ' · ' + ((spent / budget) * 100).toFixed(0) + '%';
+      card.appendChild(metaEl);
 
-      var pctEl = document.createElement('span');
-      pctEl.className = 'summary-category-pct';
-      pctEl.textContent = pct.toFixed(1) + '%';
-      row.appendChild(pctEl);
+      // Progress bar
+      var progressEl = document.createElement('div');
+      progressEl.className = 'budget-progress';
+      var fillEl = document.createElement('div');
+      fillEl.className = 'budget-progress-fill' + (exceeded ? ' budget-progress-fill--over' : '');
+      fillEl.style.width = pct + '%';
+      progressEl.appendChild(fillEl);
+      card.appendChild(progressEl);
+    } else {
+      var metaEl2 = document.createElement('p');
+      metaEl2.className = 'category-stat-meta';
+      metaEl2.textContent = 'No budget set';
+      card.appendChild(metaEl2);
     }
 
-    categoriesEl.appendChild(row);
+    categoriesEl.appendChild(card);
   });
 }
 
@@ -1526,8 +1548,8 @@ function renderCharts() {
  * Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7
  */
 function renderCategoryManager() {
-  var list    = document.getElementById('category-list');
-  var form    = document.getElementById('category-form');
+  var list      = document.getElementById('category-list');
+  var form      = document.getElementById('category-form');
   var nameInput = document.getElementById('new-category-name');
   var errorEl   = document.getElementById('new-category-error');
 
@@ -1545,18 +1567,18 @@ function renderCategoryManager() {
     var inUse = usedByExpense || usedByBudget;
 
     var li = document.createElement('li');
-    li.className = 'category-list-item';
+    li.className = 'category-list-item' + (isDefault ? ' category-list-item--default' : '');
     li.setAttribute('role', 'listitem');
 
     var nameEl = document.createElement('span');
-    nameEl.className = 'category-list-item-name';
     nameEl.textContent = cat;
     li.appendChild(nameEl);
 
     var deleteBtn = document.createElement('button');
     deleteBtn.type = 'button';
-    deleteBtn.className = 'btn btn-danger btn-sm';
-    deleteBtn.textContent = 'Delete';
+    deleteBtn.className = 'category-delete-btn';
+    deleteBtn.innerHTML = '×';
+    deleteBtn.setAttribute('aria-label', 'Delete category ' + cat);
 
     if (isDefault) {
       deleteBtn.disabled = true;
@@ -1612,41 +1634,48 @@ function renderToast(message, type) {
   var container = document.getElementById('toast-container');
   if (!container) return;
 
+  var t = type || 'info';
+
+  // Icon SVG per type
+  var iconSvg = {
+    error:   '<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+    warning: '<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+    info:    '<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
+  };
+
   var toast = document.createElement('div');
-  toast.className = 'toast toast--' + (type || 'info');
+  toast.className = 'toast toast--' + t;
   toast.setAttribute('role', 'status');
   toast.setAttribute('aria-live', 'polite');
+  toast.innerHTML = (iconSvg[t] || iconSvg.info);
 
   var msgEl = document.createElement('span');
+  msgEl.className = 'toast-message';
   msgEl.textContent = message;
   toast.appendChild(msgEl);
 
-  // Close button
   var closeBtn = document.createElement('button');
   closeBtn.type = 'button';
-  closeBtn.className = 'btn btn-ghost btn-sm';
+  closeBtn.className = 'toast-dismiss';
   closeBtn.setAttribute('aria-label', 'Dismiss notification');
   closeBtn.textContent = '×';
-  closeBtn.style.marginLeft = 'auto';
-  closeBtn.style.padding = '0 4px';
-  closeBtn.style.minHeight = 'unset';
-  closeBtn.style.minWidth  = 'unset';
   closeBtn.addEventListener('click', function () {
-    if (toast.parentNode) toast.parentNode.removeChild(toast);
+    dismiss(toast);
   });
   toast.appendChild(closeBtn);
 
   container.appendChild(toast);
 
+  function dismiss(el) {
+    el.classList.add('toast--dismissing');
+    setTimeout(function () {
+      if (el.parentNode) el.parentNode.removeChild(el);
+    }, 220);
+  }
+
   // Auto-dismiss after 4 seconds
   setTimeout(function () {
-    if (toast.parentNode) {
-      toast.style.transition = 'opacity 0.3s ease';
-      toast.style.opacity    = '0';
-      setTimeout(function () {
-        if (toast.parentNode) toast.parentNode.removeChild(toast);
-      }, 300);
-    }
+    if (toast.parentNode) dismiss(toast);
   }, 4000);
 }
 
